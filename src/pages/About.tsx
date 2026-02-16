@@ -52,7 +52,7 @@ const About = () => {
               <h2 className="text-2xl font-semibold">Our Mission</h2>
             </div>
             <p className="text-muted-foreground">
-              To make government job applications accessible and hassle-free for every Pakistani citizen. 
+              sajid To make government job applications accessible and hassle-free for every Pakistani citizen. 
               We believe everyone deserves equal opportunity to pursue their career goals in the public sector.
             </p>
           </CardContent>

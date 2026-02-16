@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const About = () => {
   const stats = [
-    { label: "Jobs Posted", value: "500+" },
+    { label: "Jobs Posted till today ", value: "500+" },
     { label: "Applications Processed", value: "10,000+" },
     { label: "Success Rate", value: "95%" },
     { label: "Years Experience", value: "5+" },

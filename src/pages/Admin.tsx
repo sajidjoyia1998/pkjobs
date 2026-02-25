@@ -48,7 +48,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import AdminChatPanel from "@/components/chat/AdminChatPanel";
 import { useAdminStartConversation } from "@/hooks/useChat";
 import { toast } from "@/hooks/use-toast";
-import { useBulkCreateJobs, parseJobsFromJson, BULK_JOB_SAMPLE, ValidationOptions, ParsedJob } from "@/hooks/useBulkJobImport";
+import { useBulkCreateJobs, parseJobsFromText, BULK_JOB_SAMPLE, ValidationOptions } from "@/hooks/useBulkJobImport";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Copy, FileUp } from "lucide-react";
 import EducationFieldsManager from "@/components/admin/EducationFieldsManager";
@@ -87,9 +87,7 @@ const Admin = () => {
   const [showServiceCategoriesManager, setShowServiceCategoriesManager] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkJobText, setBulkJobText] = useState("");
-  const [bulkParseResult, setBulkParseResult] = useState<{ jobs: ParsedJob[]; errors: string[]; skippedJobs: { title: string; reasons: string[] }[]; missingEducationFields: { name: string; suggestedLevel: string }[] } | null>(null);
-  const [bulkJobs, setBulkJobs] = useState<ParsedJob[]>([]);
-  const [bulkJobValidationErrors, setBulkJobValidationErrors] = useState<string[]>([]);
+  const [bulkParseResult, setBulkParseResult] = useState<{ jobs: any[]; errors: string[]; skippedJobs: { title: string; reasons: string[] }[]; missingEducationFields: { name: string; suggestedLevel: string }[] } | null>(null);
   const [selectedEducationFields, setSelectedEducationFields] = useState<string[]>([]);
   
   const [formData, setFormData] = useState({
@@ -200,35 +198,19 @@ const Admin = () => {
       educationFields: educationFields,
       provinces: PROVINCE_OPTIONS,
     };
-    const result = parseJobsFromJson(bulkJobText, validationOptions);
+    const result = parseJobsFromText(bulkJobText, validationOptions);
     setBulkParseResult(result);
-    setBulkJobs(result.jobs);
-    setBulkJobValidationErrors([]);
-
-    if (result.jobs.length === 0 && result.errors.length === 0 && result.skippedJobs.length === 0) {
-      toast({
-        title: "No jobs found",
-        description: "Please paste a JSON array of job objects.",
-        variant: "destructive",
-      });
-    }
-
-    if (result.errors.length > 0) {
-      toast({
-        title: "Bulk parse errors",
-        description: "Some issues were found in the JSON. See details below.",
-        variant: "destructive",
-      });
-    }
-
+    
+    // Show toast for skipped jobs
     if (result.skippedJobs.length > 0) {
       toast({
         title: `${result.skippedJobs.length} job(s) skipped`,
-        description: "Some jobs have invalid data. Check the preview for details.",
+        description: "Some jobs have invalid categories. Check the preview for details.",
         variant: "destructive",
       });
     }
-
+    
+    // Show toast for missing education fields
     if (result.missingEducationFields.length > 0) {
       toast({
         title: `${result.missingEducationFields.length} education field(s) missing`,
@@ -238,57 +220,14 @@ const Admin = () => {
     }
   };
 
-  const updateBulkJob = <K extends keyof ParsedJob>(index: number, field: K, value: ParsedJob[K]) => {
-    setBulkJobs((prev) => prev.map((job, i) => (i === index ? { ...job, [field]: value } : job)));
-  };
-
-  const validateBulkJobsBeforeImport = (jobsToValidate: ParsedJob[]): string[] => {
-    const errors: string[] = [];
-
-    jobsToValidate.forEach((job, index) => {
-      const label = `${index + 1}. ${job.title || "Untitled Job"}`;
-
-      if (!job.title) {
-        errors.push(`${label}: Missing title`);
-      }
-      if (!job.department) {
-        errors.push(`${label}: Missing department`);
-      }
-      if (!job.required_education_levels || job.required_education_levels.length === 0) {
-        errors.push(`${label}: Select at least one education level`);
-      }
-      if (!job.last_date) {
-        errors.push(`${label}: Missing last date`);
-      }
-      if (!job.total_seats || job.total_seats <= 0) {
-        errors.push(`${label}: Total seats must be greater than 0`);
-      }
-    });
-
-    return errors;
-  };
-
   const handleBulkImport = async () => {
-    if (!bulkParseResult || bulkJobs.length === 0) return;
-
-    const validationErrors = validateBulkJobsBeforeImport(bulkJobs);
-    if (validationErrors.length > 0) {
-      setBulkJobValidationErrors(validationErrors);
-      toast({
-        title: "Please fix validation errors",
-        description: "Review the highlighted issues in the job list before importing.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!bulkParseResult || bulkParseResult.jobs.length === 0) return;
     
     try {
-      await bulkCreateJobs.mutateAsync(bulkJobs);
+      await bulkCreateJobs.mutateAsync(bulkParseResult.jobs);
       setShowBulkImport(false);
       setBulkJobText("");
       setBulkParseResult(null);
-      setBulkJobs([]);
-      setBulkJobValidationErrors([]);
     } catch (error) {
       // Error handled in mutation
     }
@@ -354,8 +293,6 @@ const Admin = () => {
               if (!open) {
                 setBulkJobText("");
                 setBulkParseResult(null);
-                setBulkJobs([]);
-                setBulkJobValidationErrors([]);
               }
             }}>
               <DialogTrigger asChild>
@@ -371,7 +308,7 @@ const Admin = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Paste a JSON array of job objects below. You can then review and edit each job before importing all at once.
+                      Paste job data below. Each job starts with "Title:" on a new line.
                     </p>
                     <Button variant="outline" size="sm" onClick={handleCopySample} className="gap-2">
                       <Copy className="h-3 w-3" />
@@ -380,16 +317,35 @@ const Admin = () => {
                   </div>
                   
                   <div className="bg-muted/50 rounded-lg p-4 text-xs font-mono">
-                    <p className="font-semibold mb-2">Sample JSON Format:</p>
+                    <p className="font-semibold mb-2">Sample Format:</p>
                     <pre className="whitespace-pre-wrap text-muted-foreground">
-{BULK_JOB_SAMPLE}
+{`Title: Assistant Sub Inspector
+Department: Punjab Police
+Description: Assist in maintaining law and order
+Education Level: matric, intermediate
+Education Field: science, arts
+Min Age: 18
+Max Age: 30
+Gender: male (or female, any)
+Provinces: Punjab, Sindh
+Domicile: Punjab
+Total Seats: 500
+Last Date: 2026-03-15
+Bank Challan Fee: 500
+Post Office Fee: 200
+Photocopy Fee: 100
+Expert Fee: 1000
+
+Title: Junior Clerk
+Department: Ministry of Finance
+...`}
                     </pre>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Paste Jobs JSON</Label>
+                    <Label>Paste Job Data</Label>
                     <Textarea
-                      placeholder='Paste a JSON array like [{ "title": "...", "department": "...", ... }]'
+                      placeholder="Paste your job data here..."
                       rows={10}
                       value={bulkJobText}
                       onChange={(e) => {
@@ -400,15 +356,15 @@ const Admin = () => {
                     />
                   </div>
                   
-                  <div className="flex flex-wrap gap-2 items-center">
+                  <div className="flex gap-2">
                     <Button 
                       variant="outline" 
                       onClick={handleParseBulkJobs}
                       disabled={!bulkJobText.trim()}
                     >
-                      Preview & Validate JSON
+                      Preview Jobs
                     </Button>
-                    {bulkJobs.length > 0 && (
+                    {bulkParseResult && bulkParseResult.jobs.length > 0 && (
                       <Button 
                         onClick={handleBulkImport}
                         disabled={bulkCreateJobs.isPending}
@@ -419,7 +375,7 @@ const Admin = () => {
                         ) : (
                           <Plus className="h-4 w-4" />
                         )}
-                        Import {bulkJobs.length} Job{bulkJobs.length > 1 ? 's' : ''}
+                        Import {bulkParseResult.jobs.length} Job{bulkParseResult.jobs.length > 1 ? 's' : ''}
                       </Button>
                     )}
                   </div>
@@ -437,311 +393,31 @@ const Admin = () => {
                           onOpenEducationManager={() => setShowEducationManager(true)}
                         />
                         
-                        {/* Valid Jobs Editable List */}
-                        {bulkJobs.length > 0 && (
+                        {/* Valid Jobs List */}
+                        {bulkParseResult.jobs.length > 0 && (
                           <div className="pt-2 border-t">
                             <p className="text-sm font-medium text-success mb-3 flex items-center gap-2">
                               <span className="h-2 w-2 rounded-full bg-success" />
-                              {bulkJobs.length} job{bulkJobs.length > 1 ? 's' : ''} ready to review & import
+                              {bulkParseResult.jobs.length} job{bulkParseResult.jobs.length > 1 ? 's' : ''} ready to import
                             </p>
-                            {bulkJobValidationErrors.length > 0 && (
-                              <div className="mb-3 text-xs text-destructive space-y-1">
-                                {bulkJobValidationErrors.map((err, idx) => (
-                                  <div key={idx}>• {err}</div>
-                                ))}
-                              </div>
-                            )}
-                            <div className="space-y-3">
-                              {bulkJobs.map((job, i) => {
-                                const availableFieldsForLevels = educationFields.filter(
-                                  (f) => job.required_education_levels.includes(f.education_level)
-                                );
-
-                                const educationFieldOptionsForJob = availableFieldsForLevels.map(
-                                  (f) => ({
-                                    value: f.id,
-                                    label: `${f.display_name} (${
-                                      educationLevels.find((l) => l.value === f.education_level)
-                                        ?.label || f.education_level
-                                    })`,
-                                  })
-                                );
-
-                                const totalFeesForJob =
-                                  (job.bank_challan_fee || 0) +
-                                  (job.post_office_fee || 0) +
-                                  (job.photocopy_fee || 0) +
-                                  (job.expert_fee || 0);
-
-                                return (
-                                  <div key={i} className="p-3 bg-muted/50 border rounded-md space-y-3">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <p className="font-medium text-sm">
-                                        Job {i + 1}: {job.title || "Untitled"}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Last date: {job.last_date}
-                                      </p>
+                            <div className="space-y-2">
+                              {bulkParseResult.jobs.map((job, i) => (
+                                <div key={i} className="p-3 bg-muted/50 border rounded-md">
+                                  <p className="font-medium text-sm">{job.title}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {job.department} • {job.total_seats} seat{job.total_seats > 1 ? 's' : ''} • Last date: {job.last_date}
+                                  </p>
+                                  {job.required_education_levels && job.required_education_levels.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {job.required_education_levels.map((level: string, j: number) => (
+                                        <span key={j} className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+                                          {educationLevels.find(l => l.value === level)?.label || level}
+                                        </span>
+                                      ))}
                                     </div>
-                                    <div className="grid md:grid-cols-2 gap-3">
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Title *</Label>
-                                        <Input
-                                          value={job.title}
-                                          onChange={(e) => updateBulkJob(i, "title", e.target.value)}
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Department *</Label>
-                                        <Input
-                                          value={job.department}
-                                          onChange={(e) =>
-                                            updateBulkJob(i, "department", e.target.value)
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2 md:col-span-2">
-                                        <Label className="text-xs">Description</Label>
-                                        <Textarea
-                                          value={job.description || ""}
-                                          onChange={(e) =>
-                                            updateBulkJob(i, "description", e.target.value)
-                                          }
-                                          rows={2}
-                                          className="text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Education Levels *</Label>
-                                        <MultiSelect
-                                          options={educationLevels}
-                                          selected={job.required_education_levels}
-                                          onChange={(selected) => {
-                                            updateBulkJob(i, "required_education_levels", selected);
-                                            const validFields =
-                                              job.required_education_fields?.filter((fieldId) => {
-                                                const field = educationFields.find(
-                                                  (f) => f.id === fieldId
-                                                );
-                                                return (
-                                                  field &&
-                                                  selected.includes(field.education_level)
-                                                );
-                                              }) || [];
-                                            updateBulkJob(
-                                              i,
-                                              "required_education_fields",
-                                              validFields.length > 0 ? validFields : undefined
-                                            );
-                                          }}
-                                          placeholder="Select education levels..."
-                                        />
-                                      </div>
-                                      {availableFieldsForLevels.length > 0 && (
-                                        <div className="space-y-2">
-                                          <Label className="text-xs">
-                                            Required Education Fields (Optional)
-                                          </Label>
-                                          <MultiSelect
-                                            options={educationFieldOptionsForJob}
-                                            selected={job.required_education_fields || []}
-                                            onChange={(selected) =>
-                                              updateBulkJob(
-                                                i,
-                                                "required_education_fields",
-                                                selected.length > 0 ? selected : undefined
-                                              )
-                                            }
-                                            placeholder="Any field within selected levels..."
-                                          />
-                                        </div>
-                                      )}
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Min Age</Label>
-                                        <Input
-                                          type="number"
-                                          value={job.min_age}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "min_age",
-                                              parseInt(e.target.value || "0", 10) || 18
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Max Age</Label>
-                                        <Input
-                                          type="number"
-                                          value={job.max_age}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "max_age",
-                                              parseInt(e.target.value || "0", 10) || 35
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Gender</Label>
-                                        <Select
-                                          value={
-                                            job.gender_requirement === null
-                                              ? "any"
-                                              : job.gender_requirement || "any"
-                                          }
-                                          onValueChange={(v) =>
-                                            updateBulkJob(
-                                              i,
-                                              "gender_requirement",
-                                              v === "any" ? null : (v as any)
-                                            )
-                                          }
-                                        >
-                                          <SelectTrigger className="h-8 text-xs">
-                                            <SelectValue placeholder="Both Male & Female" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="any">Both Male & Female</SelectItem>
-                                            <SelectItem value="male">Male Only</SelectItem>
-                                            <SelectItem value="female">Female Only</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Provinces</Label>
-                                        <MultiSelect
-                                          options={PROVINCE_OPTIONS}
-                                          selected={job.provinces || []}
-                                          onChange={(selected) =>
-                                            updateBulkJob(
-                                              i,
-                                              "provinces",
-                                              selected.length > 0 ? selected : undefined
-                                            )
-                                          }
-                                          placeholder="All Pakistan (leave empty)"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Domicile</Label>
-                                        <Input
-                                          value={job.domicile || ""}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "domicile",
-                                              e.target.value || undefined
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Total Seats *</Label>
-                                        <Input
-                                          type="number"
-                                          value={job.total_seats}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "total_seats",
-                                              parseInt(e.target.value || "0", 10) || 1
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Last Date *</Label>
-                                        <Input
-                                          type="date"
-                                          value={job.last_date}
-                                          onChange={(e) =>
-                                            updateBulkJob(i, "last_date", e.target.value)
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Bank Challan Fee</Label>
-                                        <Input
-                                          type="number"
-                                          value={job.bank_challan_fee}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "bank_challan_fee",
-                                              parseInt(e.target.value || "0", 10) || 0
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Post Office Fee</Label>
-                                        <Input
-                                          type="number"
-                                          value={job.post_office_fee}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "post_office_fee",
-                                              parseInt(e.target.value || "0", 10) || 0
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Photocopy Fee</Label>
-                                        <Input
-                                          type="number"
-                                          value={job.photocopy_fee}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "photocopy_fee",
-                                              parseInt(e.target.value || "0", 10) || 0
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label className="text-xs">Expert Fee</Label>
-                                        <Input
-                                          type="number"
-                                          value={job.expert_fee}
-                                          onChange={(e) =>
-                                            updateBulkJob(
-                                              i,
-                                              "expert_fee",
-                                              parseInt(e.target.value || "0", 10) || 0
-                                            )
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-1 md:col-span-2">
-                                        <p className="text-xs text-muted-foreground">
-                                          Total Calculated Cost:{" "}
-                                          <span className="font-semibold text-foreground">
-                                            Rs. {totalFeesForJob.toLocaleString()}
-                                          </span>
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}

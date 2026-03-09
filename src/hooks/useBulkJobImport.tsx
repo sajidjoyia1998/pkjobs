@@ -19,6 +19,8 @@ export interface ParsedJob {
   post_office_fee: number;
   photocopy_fee: number;
   expert_fee: number;
+  advertisement_link?: string;
+  advertisement_image?: string;
 }
 
 export interface EducationField {

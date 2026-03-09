@@ -102,7 +102,8 @@ export const isEligibleForJob = (
     provinces: string[] | null;
     domicile: string | null;
   },
-  userEducations?: UserEducationEntry[]
+  userEducations?: UserEducationEntry[],
+  allEducationFields?: { id: string; education_level: string }[]
 ): { eligible: boolean; reasons: string[] } => {
   const reasons: string[] = [];
 
@@ -123,38 +124,63 @@ export const isEligibleForJob = (
     reasons.push(`Gender requirement: ${job.gender_requirement} only`);
   }
 
-  // Check education level using user_educations table
+  // --- Hierarchical education level check ---
+  // User qualifies if they have ANY education level >= any of the required levels
   if (requiredLevels.length > 0) {
+    const minRequiredRank = Math.min(...requiredLevels.map(getEducationLevel));
+
     if (userEducations && userEducations.length > 0) {
-      const hasMatchingLevel = userEducations.some(ue => 
-        requiredLevels.includes(ue.education_level)
-      );
-      if (!hasMatchingLevel) {
+      const userMaxRank = Math.max(...userEducations.map(ue => getEducationLevel(ue.education_level)));
+      if (userMaxRank < minRequiredRank) {
         reasons.push(`Education level requirement: ${requiredLevels.join(", ")}`);
       }
     } else if (profile.education) {
-      // Fallback to profile.education if no user_educations entries
-      if (!requiredLevels.includes(profile.education)) {
-        const userLevel = getEducationLevel(profile.education);
-        const minRequired = Math.min(...requiredLevels.map(getEducationLevel));
-        if (userLevel < minRequired) {
-          reasons.push(`Education level requirement: ${requiredLevels.join(", ")}`);
-        }
+      const userRank = getEducationLevel(profile.education);
+      if (userRank < minRequiredRank) {
+        reasons.push(`Education level requirement: ${requiredLevels.join(", ")}`);
       }
     }
   }
 
-  // Check education specialization/fields
+  // --- Field-aware check ---
+  // If job requires specific fields:
+  //   - User passes if they have a matching field, OR
+  //   - User passes if their education level is HIGHER than the level the required fields belong to
   if (requiredFields.length > 0) {
+    let fieldEligible = false;
+
     if (userEducations && userEducations.length > 0) {
-      const hasMatchingField = userEducations.some(ue => 
+      // Check direct field match
+      const hasMatchingField = userEducations.some(ue =>
         ue.education_field_id && requiredFields.includes(ue.education_field_id)
       );
-      if (!hasMatchingField) {
-        reasons.push(`Education specialization requirement not met`);
+
+      if (hasMatchingField) {
+        fieldEligible = true;
+      } else {
+        // Check if user has a HIGHER level than the field's level (field-aware hierarchy)
+        // Find the highest level among required fields
+        let maxFieldLevel = 0;
+        if (allEducationFields) {
+          for (const fieldId of requiredFields) {
+            const field = allEducationFields.find(f => f.id === fieldId);
+            if (field) {
+              maxFieldLevel = Math.max(maxFieldLevel, getEducationLevel(field.education_level));
+            }
+          }
+        }
+
+        if (maxFieldLevel > 0) {
+          const userMaxRank = Math.max(...userEducations.map(ue => getEducationLevel(ue.education_level)));
+          if (userMaxRank > maxFieldLevel) {
+            fieldEligible = true;
+          }
+        }
       }
-    } else {
-      reasons.push(`Education specialization requirement not met (update your profile)`);
+    }
+
+    if (!fieldEligible) {
+      reasons.push(`Education specialization requirement not met`);
     }
   }
 

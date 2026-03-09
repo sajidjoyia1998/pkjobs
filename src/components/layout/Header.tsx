@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Briefcase, User, Shield, LogOut } from "lucide-react";
+import { Menu, X, Briefcase, User, Shield, LogOut, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -11,7 +11,7 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, signOut, loading } = useAuth();
+  const { user, isAdmin, isExpert, signOut, loading } = useAuth();
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -62,6 +62,14 @@ const Header = () => {
           {!loading && user && <NotificationDropdown />}
           {!loading && user ? (
             <>
+              {isExpert && (
+                <Link to="/expert">
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <UserCheck className="h-4 w-4" />
+                    Expert
+                  </Button>
+                </Link>
+              )}
               {isAdmin && (
                 <Link to="/admin">
                   <Button variant="ghost" size="sm" className="gap-2">

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,11 +15,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Loader2, GraduationCap, BookOpen } from "lucide-react";
+import { Trash2, Plus, Loader2, GraduationCap, BookOpen, ArrowUp, ArrowDown } from "lucide-react";
 import {
   useEducationFields,
   useAddEducationField,
   useDeleteEducationField,
+  useUpdateFieldSortOrder,
 } from "@/hooks/useEducationFields";
 import {
   useCustomEducationLevels,
@@ -36,6 +36,7 @@ const EducationFieldsManager = () => {
   const deleteEducationField = useDeleteEducationField();
   const addEducationLevel = useAddEducationLevel();
   const deleteEducationLevel = useDeleteEducationLevel();
+  const updateSortOrder = useUpdateFieldSortOrder();
 
   const [newLevelName, setNewLevelName] = useState("");
   const [newLevelDisplayName, setNewLevelDisplayName] = useState("");
@@ -43,13 +44,12 @@ const EducationFieldsManager = () => {
   const [newFieldName, setNewFieldName] = useState("");
   const [newFieldDisplayName, setNewFieldDisplayName] = useState("");
 
-  // Combine default and custom education levels
   const allLevels = [
     ...DEFAULT_EDUCATION_LEVELS,
     ...customLevels.map((l) => ({ value: l.name, label: l.display_name })),
   ];
 
-  // Group fields by level
+  // Group fields by level, sorted by sort_order
   const fieldsByLevel = educationFields.reduce((acc, field) => {
     if (!acc[field.education_level]) {
       acc[field.education_level] = [];
@@ -57,6 +57,11 @@ const EducationFieldsManager = () => {
     acc[field.education_level].push(field);
     return acc;
   }, {} as Record<string, typeof educationFields>);
+
+  // Sort each group by sort_order
+  Object.values(fieldsByLevel).forEach((fields) =>
+    fields.sort((a, b) => a.sort_order - b.sort_order)
+  );
 
   const handleAddLevel = async () => {
     if (!newLevelName || !newLevelDisplayName) return;
@@ -70,6 +75,10 @@ const EducationFieldsManager = () => {
 
   const handleAddField = async () => {
     if (!selectedLevel || !newFieldName || !newFieldDisplayName) return;
+    const existingFields = fieldsByLevel[selectedLevel] || [];
+    const maxOrder = existingFields.length > 0
+      ? Math.max(...existingFields.map((f) => f.sort_order))
+      : 0;
     await addEducationField.mutateAsync({
       education_level: selectedLevel,
       name: newFieldName.toLowerCase().replace(/\s+/g, "_"),
@@ -77,6 +86,19 @@ const EducationFieldsManager = () => {
     });
     setNewFieldName("");
     setNewFieldDisplayName("");
+  };
+
+  const handleMoveField = (level: string, index: number, direction: "up" | "down") => {
+    const fields = [...(fieldsByLevel[level] || [])];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= fields.length) return;
+
+    // Swap sort_order values
+    const updates = [
+      { id: fields[index].id, sort_order: fields[targetIndex].sort_order },
+      { id: fields[targetIndex].id, sort_order: fields[index].sort_order },
+    ];
+    updateSortOrder.mutate(updates);
   };
 
   const getLevelLabel = (value: string) => {
@@ -117,7 +139,6 @@ const EducationFieldsManager = () => {
           </Button>
         </div>
 
-        {/* List custom levels */}
         {customLevels.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {customLevels.map((level) => (
@@ -192,7 +213,7 @@ const EducationFieldsManager = () => {
         </div>
       </div>
 
-      {/* Fields by Level */}
+      {/* Fields by Level with reorder */}
       {fieldsLoading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -217,21 +238,46 @@ const EducationFieldsManager = () => {
                       No fields added yet. Add fields above.
                     </p>
                   ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {fields.map((field) => (
+                    <div className="space-y-1">
+                      {fields.map((field, index) => (
                         <div
                           key={field.id}
-                          className="flex items-center justify-between p-2 rounded bg-muted"
+                          className="flex items-center justify-between p-2 rounded bg-muted gap-2"
                         >
-                          <span className="text-sm truncate">{field.display_name}</span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0"
-                            onClick={() => deleteEducationField.mutate(field.id)}
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs text-muted-foreground w-6 text-center shrink-0">
+                              {index + 1}
+                            </span>
+                            <span className="text-sm truncate">{field.display_name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={index === 0 || updateSortOrder.isPending}
+                              onClick={() => handleMoveField(level.value, index, "up")}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={index === fields.length - 1 || updateSortOrder.isPending}
+                              onClick={() => handleMoveField(level.value, index, "down")}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => deleteEducationField.mutate(field.id)}
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>

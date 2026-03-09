@@ -24,6 +24,8 @@ export interface Job {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  advertisement_link: string | null;
+  advertisement_image: string | null;
 }
 
 // Helper to normalize job data (handle null arrays from DB)
@@ -51,6 +53,8 @@ export interface CreateJobInput {
   post_office_fee: number;
   photocopy_fee: number;
   expert_fee: number;
+  advertisement_link?: string;
+  advertisement_image?: string;
 }
 
 export const useJobs = (filters?: {

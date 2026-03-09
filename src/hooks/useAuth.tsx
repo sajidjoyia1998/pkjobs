@@ -193,6 +193,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }))
         );
       }
+
+      // Refresh profile to show updated data
+      await fetchProfile(newUser.id);
     }
 
     toast.success("Account created successfully!");

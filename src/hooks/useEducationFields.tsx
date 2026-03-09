@@ -7,6 +7,7 @@ export interface EducationField {
   education_level: string;
   name: string;
   display_name: string;
+  sort_order: number;
   created_at: string;
   created_by: string | null;
 }
@@ -28,6 +29,7 @@ export const useEducationFields = () => {
       const { data, error } = await supabase
         .from("education_fields")
         .select("*")
+        .order("sort_order", { ascending: true })
         .order("display_name", { ascending: true });
 
       if (error) throw error;
@@ -45,6 +47,7 @@ export const useEducationFieldsByLevel = (level: string) => {
         .from("education_fields")
         .select("*")
         .eq("education_level", level)
+        .order("sort_order", { ascending: true })
         .order("display_name", { ascending: true });
 
       if (error) throw error;
@@ -130,7 +133,29 @@ export const useDeleteEducationField = () => {
   });
 };
 
-// Add user education entry
+// Update education field sort orders
+export const useUpdateFieldSortOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (updates: { id: string; sort_order: number }[]) => {
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("education_fields")
+          .update({ sort_order: update.sort_order })
+          .eq("id", update.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["education-fields"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+};
+
 export const useAddUserEducation = () => {
   const queryClient = useQueryClient();
 

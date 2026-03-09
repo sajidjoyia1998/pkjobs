@@ -18,6 +18,8 @@ import FAQ from "./pages/FAQ";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
+import BulkJobImport from "./pages/BulkJobImport";
+import ExpertDashboard from "./pages/ExpertDashboard";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +49,16 @@ const App = () => (
                 <Route path="/admin" element={
                   <ProtectedRoute requireAdmin>
                     <Admin />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/bulk-import" element={
+                  <ProtectedRoute requireAdmin>
+                    <BulkJobImport />
+                  </ProtectedRoute>
+                } />
+                <Route path="/expert" element={
+                  <ProtectedRoute requireExpert>
+                    <ExpertDashboard />
                   </ProtectedRoute>
                 } />
                 <Route path="*" element={<NotFound />} />

@@ -246,15 +246,17 @@ export const useAdminStartConversation = () => {
   const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async ({ userId, applicationId, jobTitle }: { userId: string; applicationId: string; jobTitle: string }) => {
+    mutationFn: async ({ userId, applicationId, workRequestId, jobTitle }: { userId: string; applicationId?: string; workRequestId?: string; jobTitle: string }) => {
       if (!user) throw new Error('Not authenticated');
       
-      // Check if conversation already exists for this application
-      const { data: existing } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('application_id', applicationId)
-        .single();
+      // Check if conversation already exists for this application or work request
+      let query = supabase.from('conversations').select('*');
+      if (applicationId) {
+        query = query.eq('application_id', applicationId);
+      } else if (workRequestId) {
+        query = query.eq('work_request_id', workRequestId);
+      }
+      const { data: existing } = await query.single();
       
       if (existing) return existing;
       
@@ -264,8 +266,9 @@ export const useAdminStartConversation = () => {
         .insert({
           user_id: userId,
           admin_id: user.id,
-          subject: `Application: ${jobTitle}`,
-          application_id: applicationId,
+          subject: applicationId ? `Application: ${jobTitle}` : `Work Request: ${jobTitle}`,
+          application_id: applicationId || null,
+          work_request_id: workRequestId || null,
         })
         .select()
         .single();

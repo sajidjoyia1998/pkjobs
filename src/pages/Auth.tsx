@@ -1,48 +1,50 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Briefcase, Mail, Lock, User, Calendar, MapPin, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Briefcase, Mail, Lock, User, Loader2, RefreshCw } from "lucide-react";
 import { useSearchParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { toast } from "sonner";
-import EducationSelector, { EducationEntry } from "@/components/education/EducationSelector";
 import { lovable } from "@/integrations/lovable/index";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters").max(100);
 const nameSchema = z.string().trim().min(1, "Name is required").max(100);
 
+const generateCaptcha = () => {
+  const a = Math.floor(Math.random() * 9) + 1;
+  const b = Math.floor(Math.random() * 9) + 1;
+  return { a, b, answer: a + b };
+};
+
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn, signUp, user, loading: authLoading } = useAuth();
-  
+
   const [isLogin, setIsLogin] = useState(searchParams.get("mode") !== "register");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    dob: "",
-    gender: "",
-    province: "",
-    domicile: "",
   });
-  
-  const [educationEntries, setEducationEntries] = useState<EducationEntry[]>([]);
+
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [captcha, setCaptcha] = useState(generateCaptcha());
+  const [captchaInput, setCaptchaInput] = useState("");
+
+  const refreshCaptcha = () => {
+    setCaptcha(generateCaptcha());
+    setCaptchaInput("");
+  };
 
   // Redirect if already logged in
   useEffect(() => {
@@ -77,7 +79,6 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      // Validate email
       const emailResult = emailSchema.safeParse(formData.email);
       if (!emailResult.success) {
         toast.error(emailResult.error.errors[0].message);
@@ -85,7 +86,6 @@ const Auth = () => {
         return;
       }
 
-      // Validate password
       const passwordResult = passwordSchema.safeParse(formData.password);
       if (!passwordResult.success) {
         toast.error(passwordResult.error.errors[0].message);
@@ -99,7 +99,6 @@ const Auth = () => {
           navigate("/dashboard");
         }
       } else {
-        // Validate name
         const nameResult = nameSchema.safeParse(formData.name);
         if (!nameResult.success) {
           toast.error(nameResult.error.errors[0].message);
@@ -107,24 +106,34 @@ const Auth = () => {
           return;
         }
 
-        // Check password confirmation
         if (formData.password !== formData.confirmPassword) {
           toast.error("Passwords do not match");
           setLoading(false);
           return;
         }
 
+        if (!agreeTerms) {
+          toast.error("Please agree to our Terms of Service and Privacy Policy");
+          setLoading(false);
+          return;
+        }
+
+        if (parseInt(captchaInput, 10) !== captcha.answer) {
+          toast.error("Incorrect answer to the math question. Please try again.");
+          refreshCaptcha();
+          setLoading(false);
+          return;
+        }
+
         const { error } = await signUp(formData.email, formData.password, {
           full_name: formData.name,
-          date_of_birth: formData.dob || undefined,
-          gender: formData.gender || undefined,
-          province: formData.province || undefined,
-          domicile: formData.domicile || undefined,
-          educations: educationEntries,
+          educations: [],
         });
-        
+
         if (!error) {
           navigate("/dashboard");
+        } else {
+          refreshCaptcha();
         }
       }
     } finally {
@@ -167,93 +176,20 @@ const Auth = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name *</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="name"
-                      placeholder="Enter your full name"
-                      className="pl-10"
-                      value={formData.name}
-                      onChange={(e) => handleChange("name", e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dob">Date of Birth</Label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="dob" 
-                        type="date" 
-                        className="pl-10"
-                        value={formData.dob}
-                        onChange={(e) => handleChange("dob", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gender">Gender</Label>
-                    <Select value={formData.gender} onValueChange={(v) => handleChange("gender", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Education</Label>
-                  <EducationSelector
-                    value={educationEntries}
-                    onChange={setEducationEntries}
-                    maxEntries={3}
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name *</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    placeholder="Enter your full name"
+                    className="pl-10"
+                    value={formData.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    required
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="province">Province</Label>
-                    <Select value={formData.province} onValueChange={(v) => handleChange("province", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Punjab">Punjab</SelectItem>
-                        <SelectItem value="Sindh">Sindh</SelectItem>
-                        <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
-                        <SelectItem value="Balochistan">Balochistan</SelectItem>
-                        <SelectItem value="Islamabad">Islamabad</SelectItem>
-                        <SelectItem value="AJK">AJK</SelectItem>
-                        <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="domicile">Domicile</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="domicile"
-                        placeholder="e.g., Lahore"
-                        className="pl-10"
-                        value={formData.domicile}
-                        onChange={(e) => handleChange("domicile", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </>
+              </div>
             )}
 
             <div className="space-y-2">
@@ -289,21 +225,72 @@ const Auth = () => {
             </div>
 
             {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    className="pl-10"
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleChange("confirmPassword", e.target.value)}
-                    required
-                  />
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="Confirm your password"
+                      className="pl-10"
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleChange("confirmPassword", e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+
+                {/* Math Captcha */}
+                <div className="space-y-2">
+                  <Label htmlFor="captcha">Human Check *</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-shrink-0 px-3 py-2 rounded-md bg-muted border border-border font-mono text-sm font-semibold select-none">
+                      {captcha.a} + {captcha.b} = ?
+                    </div>
+                    <Input
+                      id="captcha"
+                      type="number"
+                      placeholder="Answer"
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value)}
+                      required
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={refreshCaptcha}
+                      aria-label="Refresh captcha"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Terms Agreement */}
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox
+                    id="agreeTerms"
+                    checked={agreeTerms}
+                    onCheckedChange={(v) => setAgreeTerms(v === true)}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="agreeTerms" className="text-sm font-normal leading-snug cursor-pointer">
+                    I agree to the{" "}
+                    <Link to="/terms" target="_blank" className="text-primary hover:underline">
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link to="/privacy" target="_blank" className="text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </Label>
+                </div>
+              </>
             )}
 
             <Button type="submit" className="w-full" size="lg" disabled={loading}>

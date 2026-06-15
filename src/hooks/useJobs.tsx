@@ -26,6 +26,7 @@ export interface Job {
   updated_at: string;
   advertisement_link: string | null;
   advertisement_image: string | null;
+  test_preparation_available: boolean;
 }
 
 // Helper to normalize job data (handle null arrays from DB)
@@ -55,6 +56,7 @@ export interface CreateJobInput {
   expert_fee: number;
   advertisement_link?: string;
   advertisement_image?: string;
+  test_preparation_available?: boolean;
 }
 
 export const useJobs = (filters?: {
@@ -72,9 +74,15 @@ export const useJobs = (filters?: {
         .order("created_at", { ascending: false });
 
       if (filters?.search) {
-        query = query.or(
-          `title.ilike.%${filters.search}%,department.ilike.%${filters.search}%`
-        );
+        const safe = filters.search
+          .replace(/[\\%_*]/g, "\\$&")
+          .replace(/[,()]/g, " ")
+          .trim();
+        if (safe) {
+          query = query.or(
+            `title.ilike.%${safe}%,department.ilike.%${safe}%`
+          );
+        }
       }
 
       if (filters?.province && filters.province !== "all") {
@@ -164,6 +172,32 @@ export const useDeleteJob = () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["all-jobs"] });
       toast.success("Job deleted successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+};
+
+export const useUpdateJob = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<CreateJobInput> }) => {
+      const { data, error } = await supabase
+        .from("jobs")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["all-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job"] });
+      toast.success("Job updated successfully!");
     },
     onError: (error: Error) => {
       toast.error(error.message);

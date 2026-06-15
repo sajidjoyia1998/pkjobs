@@ -1,0 +1,1 @@
+alter table public.global_seo_settings add column if not exists test_prep_url text;

@@ -208,7 +208,7 @@ const UserManagement = () => {
   return (
     <div>
       {/* Header & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-foreground">
@@ -224,6 +224,14 @@ const UserManagement = () => {
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
+      </div>
+
+      {/* Expert management hint */}
+      <div className="flex items-start gap-2 p-2.5 mb-4 rounded-lg bg-accent/50 border border-accent text-xs text-accent-foreground">
+        <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
+        <p>
+          Use the <strong>green shield</strong> button to <strong>make a user an Expert</strong>, or the <strong>amber shield</strong> to remove the role. Experts handle assigned applications & work requests.
+        </p>
       </div>
 
       {/* Desktop Table */}
@@ -332,25 +340,31 @@ const UserManagement = () => {
                     Joined: {new Date(user.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex flex-col gap-1.5 shrink-0">
                   <Button
-                    variant="ghost"
+                    variant={isExpert(user.user_id) ? "outline" : "secondary"}
                     size="sm"
                     onClick={() => handleToggleExpert(user.user_id)}
                     disabled={isAdmin(user.user_id)}
-                    title={isExpert(user.user_id) ? "Remove Expert" : "Make Expert"}
+                    className="h-7 px-2 text-[10px] gap-1"
                   >
-                    {isExpert(user.user_id) ? <ShieldX className="h-4 w-4 text-warning" /> : <ShieldCheck className="h-4 w-4 text-success" />}
+                    {isExpert(user.user_id) ? (
+                      <><ShieldX className="h-3 w-3 text-warning" /> Remove Expert</>
+                    ) : (
+                      <><ShieldCheck className="h-3 w-3 text-success" /> Make Expert</>
+                    )}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setViewingUser(user)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setDeletingUser({ userId: user.user_id, name: user.full_name })} disabled={isAdmin(user.user_id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setViewingUser(user)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDeletingUser({ userId: user.user_id, name: user.full_name })} disabled={isAdmin(user.user_id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

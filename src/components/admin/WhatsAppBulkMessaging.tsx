@@ -159,7 +159,6 @@ const useEligibleUsers = (job: JobOption | null) => {
           ) {
             return false;
           }
-            return false;
 
           return true;
         });

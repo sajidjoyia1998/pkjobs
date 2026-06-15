@@ -1,7 +1,11 @@
 import { Link } from "react-router-dom";
-import { Briefcase, Mail, Phone, MapPin } from "lucide-react";
+import { Briefcase, Mail, Phone, MapPin, BookOpen, ExternalLink } from "lucide-react";
+import { useSeoSettings } from "@/hooks/useSeoSettings";
 
 const Footer = () => {
+  const { data: settings } = useSeoSettings();
+  const testPrepUrl = settings?.test_prep_url?.trim();
+
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="container py-12">
@@ -41,6 +45,11 @@ const Footer = () => {
                   My Dashboard
                 </Link>
               </li>
+              <li>
+                <Link to="/careers" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                  Join Our Team
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -63,6 +72,19 @@ const Footer = () => {
                   Terms of Service
                 </Link>
               </li>
+              {testPrepUrl && (
+                <li>
+                  <a
+                    href={testPrepUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
+                  >
+                    Test Preparation
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
 

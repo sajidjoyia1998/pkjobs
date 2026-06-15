@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import ChatMessageInput from './ChatMessageInput';
 import ChatMessageBubble from './ChatMessageBubble';
+import { supabase } from '@/integrations/supabase/client';
 
 // Event for opening chat with specific application
 export const openApplicationChat = (applicationId: string, jobTitle: string) => {
@@ -25,11 +26,17 @@ export const openApplicationChat = (applicationId: string, jobTitle: string) => 
   }));
 };
 
+// Event for opening chat from notification (any conversation)
+export const openChatWindow = (conversationId?: string) => {
+  window.dispatchEvent(new CustomEvent('openChatWindow', { detail: { conversationId } }));
+};
+
 const ChatWidget = () => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [vibrate, setVibrate] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations = [], isLoading: loadingConversations } = useMyConversations();
@@ -63,6 +70,44 @@ const ChatWidget = () => {
       window.removeEventListener('openApplicationChat', handleApplicationChat as EventListener);
     };
   }, [handleApplicationChat]);
+
+  // Listen for generic openChatWindow event (e.g. from notification clicks)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ conversationId?: string }>;
+      setIsOpen(true);
+      if (ce.detail?.conversationId) {
+        setSelectedConversation(ce.detail.conversationId);
+      }
+    };
+    window.addEventListener('openChatWindow', handler);
+    return () => window.removeEventListener('openChatWindow', handler);
+  }, []);
+
+  // Subscribe to new incoming messages globally — open chat & vibrate icon
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`global-messages:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const msg = payload.new as { sender_id: string; conversation_id: string };
+          if (msg.sender_id === user.id) return;
+          // Auto-open chat window for the new message
+          setIsOpen(true);
+          setSelectedConversation(msg.conversation_id);
+          // Trigger vibration animation
+          setVibrate(true);
+          window.setTimeout(() => setVibrate(false), 1200);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -105,7 +150,10 @@ const ChatWidget = () => {
       {/* Chat Button */}
       <Button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg"
+        className={cn(
+          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg",
+          vibrate && "animate-chat-vibrate"
+        )}
         size="icon"
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}

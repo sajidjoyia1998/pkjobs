@@ -20,6 +20,7 @@ import {
 } from "@/hooks/useNotifications";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { openChatWindow } from "@/components/chat/ChatWidget";
 
 const NotificationDropdown = () => {
   const { data: notifications = [], isLoading } = useNotifications();
@@ -47,11 +48,14 @@ const NotificationDropdown = () => {
     if (!notification.is_read) {
       markRead.mutate(notification.id);
     }
-    
-    // Navigate based on notification type
-    if (notification.reference_type === 'conversation') {
-      navigate('/dashboard');
-    } else if (notification.reference_type === 'application') {
+
+    // Open chat window when it's a message notification
+    if (notification.type === 'message' || notification.reference_type === 'conversation') {
+      openChatWindow(notification.reference_id || undefined);
+      return;
+    }
+
+    if (notification.reference_type === 'application') {
       navigate('/dashboard');
     }
   };

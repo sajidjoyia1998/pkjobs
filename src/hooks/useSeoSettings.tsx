@@ -23,6 +23,9 @@ export interface SeoSettings {
   social_youtube: string | null;
   google_search_console_verification: string | null;
   google_analytics_id: string | null;
+  test_prep_banner_html: string | null;
+  jobs_ad_html: string | null;
+  test_prep_url: string | null;
   created_at: string;
   updated_at: string;
 }

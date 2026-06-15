@@ -181,6 +181,7 @@ export type Database = {
           google_analytics_id: string | null
           google_search_console_verification: string | null
           id: string
+          jobs_ad_html: string | null
           logo_url: string | null
           organization_name: string | null
           site_description: string | null
@@ -190,6 +191,8 @@ export type Database = {
           social_linkedin: string | null
           social_twitter: string | null
           social_youtube: string | null
+          test_prep_banner_html: string | null
+          test_prep_url: string | null
           updated_at: string
           website_name: string | null
           website_url: string | null
@@ -205,6 +208,7 @@ export type Database = {
           google_analytics_id?: string | null
           google_search_console_verification?: string | null
           id?: string
+          jobs_ad_html?: string | null
           logo_url?: string | null
           organization_name?: string | null
           site_description?: string | null
@@ -214,6 +218,8 @@ export type Database = {
           social_linkedin?: string | null
           social_twitter?: string | null
           social_youtube?: string | null
+          test_prep_banner_html?: string | null
+          test_prep_url?: string | null
           updated_at?: string
           website_name?: string | null
           website_url?: string | null
@@ -229,6 +235,7 @@ export type Database = {
           google_analytics_id?: string | null
           google_search_console_verification?: string | null
           id?: string
+          jobs_ad_html?: string | null
           logo_url?: string | null
           organization_name?: string | null
           site_description?: string | null
@@ -238,6 +245,8 @@ export type Database = {
           social_linkedin?: string | null
           social_twitter?: string | null
           social_youtube?: string | null
+          test_prep_banner_html?: string | null
+          test_prep_url?: string | null
           updated_at?: string
           website_name?: string | null
           website_url?: string | null
@@ -266,6 +275,7 @@ export type Database = {
           provinces: string[] | null
           required_education_fields: string[] | null
           required_education_levels: string[] | null
+          test_preparation_available: boolean
           title: string
           total_fee: number | null
           total_seats: number
@@ -292,6 +302,7 @@ export type Database = {
           provinces?: string[] | null
           required_education_fields?: string[] | null
           required_education_levels?: string[] | null
+          test_preparation_available?: boolean
           title: string
           total_fee?: number | null
           total_seats?: number
@@ -318,6 +329,7 @@ export type Database = {
           provinces?: string[] | null
           required_education_fields?: string[] | null
           required_education_levels?: string[] | null
+          test_preparation_available?: boolean
           title?: string
           total_fee?: number | null
           total_seats?: number
@@ -414,6 +426,7 @@ export type Database = {
           education: Database["public"]["Enums"]["education_level"] | null
           full_name: string
           gender: Database["public"]["Enums"]["gender_type"] | null
+          gmail: string | null
           id: string
           phone: string | null
           province: string | null
@@ -428,6 +441,7 @@ export type Database = {
           education?: Database["public"]["Enums"]["education_level"] | null
           full_name: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
+          gmail?: string | null
           id?: string
           phone?: string | null
           province?: string | null
@@ -442,6 +456,7 @@ export type Database = {
           education?: Database["public"]["Enums"]["education_level"] | null
           full_name?: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
+          gmail?: string | null
           id?: string
           phone?: string | null
           province?: string | null
@@ -480,6 +495,48 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+        }
+        Relationships: []
+      }
+      team_applications: {
+        Row: {
+          created_at: string
+          cv_path: string | null
+          email: string
+          full_name: string
+          id: string
+          message: string | null
+          phone: string | null
+          position: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          cv_path?: string | null
+          email: string
+          full_name: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          position: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          cv_path?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          position?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }

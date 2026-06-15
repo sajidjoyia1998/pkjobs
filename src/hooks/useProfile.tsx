@@ -10,6 +10,7 @@ interface UpdateProfileInput {
   province?: string;
   domicile?: string;
   phone?: string;
+  gmail?: string | null;
 }
 
 export const useUpdateProfile = () => {

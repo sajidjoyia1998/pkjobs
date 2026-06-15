@@ -206,6 +206,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
     setProfile(null);
     setRoles([]);
+    // Clear cached query data so the next user on a shared device cannot
+    // see the previous user's data hydrated from localStorage.
+    try {
+      const { queryClient, RQ_PERSIST_KEY } = await import("@/App");
+      queryClient.clear();
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(RQ_PERSIST_KEY);
+      }
+    } catch {
+      // no-op
+    }
     toast.success("Signed out successfully");
   };
 

@@ -15,7 +15,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Loader2, GraduationCap, BookOpen, ArrowUp, ArrowDown } from "lucide-react";
+import { Trash2, Plus, Loader2, GraduationCap, BookOpen, ArrowUp, ArrowDown, Copy } from "lucide-react";
+import { toast } from "sonner";
 import {
   useEducationFields,
   useAddEducationField,
@@ -106,8 +107,31 @@ const EducationFieldsManager = () => {
     return level?.label || value;
   };
 
+  const handleCopyAll = async () => {
+    const lines: string[] = [];
+    for (const level of allLevels) {
+      const fields = fieldsByLevel[level.value] || [];
+      lines.push(`${level.label} (${fields.length})`);
+      fields.forEach((f, i) => lines.push(`  ${i + 1}. ${f.display_name}`));
+      lines.push("");
+    }
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("All education levels & fields copied to clipboard");
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyAll}>
+          <Copy className="h-4 w-4" />
+          Copy All Levels & Fields
+        </Button>
+      </div>
       {/* Add New Education Level */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">

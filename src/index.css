@@ -108,9 +108,27 @@
     @apply border-border;
   }
 
+  html {
+    /* Fluid root font-size: scales smoothly between 13px (small phones) and 16px (desktop) */
+    font-size: clamp(13px, 12px + 0.4vw, 16px);
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    /* Prevent horizontal scroll that makes mobile feel non-app-like */
+    overflow-x: hidden;
+  }
+
+  /* Tap target & native-app feel on mobile */
+  @media (max-width: 640px) {
+    button, a, [role="button"] {
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      overscroll-behavior-y: contain;
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -231,5 +249,15 @@
       opacity: 1;
       transform: scale(1);
     }
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }

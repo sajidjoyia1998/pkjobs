@@ -64,12 +64,11 @@ const ChatMessageInput = ({ onSend, disabled, placeholder = "Type a message..." 
 
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage
-      .from('chat-attachments')
-      .getPublicUrl(fileName);
-
+    // Bucket is private. Store the storage PATH (not a signed URL) so that
+    // viewers always fetch a freshly-signed, short-lived URL at render time.
+    // RLS on storage.objects restricts who can actually fetch the file.
     return {
-      url: data.publicUrl,
+      url: `chatpath:${fileName}`,
       name: file.name,
       type: file.type,
     };

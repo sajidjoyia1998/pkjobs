@@ -27,6 +27,8 @@ import {
   Loader2,
   Save,
   FileQuestion,
+  AlertCircle,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyApplications, Application } from "@/hooks/useApplications";
@@ -38,6 +40,17 @@ import { useAllEducationLevels } from "@/hooks/useEducationLevels";
 import { openApplicationChat } from "@/components/chat/ChatWidget";
 import { toast } from "sonner";
 import EducationSelector, { EducationEntry } from "@/components/education/EducationSelector";
+import RefreshButton from "@/components/RefreshButton";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/PullToRefreshIndicator";
+import MyDocuments from "@/components/dashboard/MyDocuments";
+import TestPrepPromo from "@/components/TestPrepPromo";
+import {
+  ServiceDisclaimerBanner,
+  ServiceDisclaimerDialog,
+  useServiceDisclaimer,
+} from "@/components/dashboard/ServiceDisclaimer";
 
 const statusLabels: Record<Application["status"], string> = {
   pending: "Pending",
@@ -69,6 +82,7 @@ const Dashboard = () => {
   const { data: allEducationLevels = [] } = useAllEducationLevels();
   const { data: allEducationFields = [] } = useEducationFields();
   
+  const disclaimer = useServiceDisclaimer();
   const [activeTab, setActiveTab] = useState("applications");
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -78,6 +92,7 @@ const Dashboard = () => {
     province: profile?.province || "",
     domicile: profile?.domicile || "",
     phone: profile?.phone || "",
+    gmail: (profile as any)?.gmail || "",
   });
   const [editEducations, setEditEducations] = useState<EducationEntry[]>([]);
 
@@ -91,6 +106,7 @@ const Dashboard = () => {
         province: profile.province || "",
         domicile: profile.domicile || "",
         phone: profile.phone || "",
+        gmail: (profile as any).gmail || "",
       });
     }
   }, [profile]);
@@ -128,6 +144,7 @@ const Dashboard = () => {
         province: editForm.province || undefined,
         domicile: editForm.domicile || undefined,
         phone: editForm.phone || undefined,
+        gmail: editForm.gmail ? editForm.gmail.trim() : null,
       });
       
       // Save educations
@@ -164,8 +181,20 @@ const Dashboard = () => {
     completed: completedItems,
   };
 
+  const qc = useQueryClient();
+  const ptr = usePullToRefresh({
+    onRefresh: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ["my-applications"] }),
+        qc.invalidateQueries({ queryKey: ["my-work-requests"] }),
+        qc.invalidateQueries({ queryKey: ["profile"] }),
+        qc.invalidateQueries({ queryKey: ["user-educations"] }),
+      ]).then(() => undefined),
+  });
+
   return (
     <div className="py-8">
+      <PullToRefreshIndicator {...ptr} />
       <div className="container">
         {/* Header */}
         <div className="mb-8">
@@ -176,6 +205,61 @@ const Dashboard = () => {
             Track your applications and manage your profile
           </p>
         </div>
+
+        {/* Service disclaimer banner */}
+        <ServiceDisclaimerBanner onOpenDialog={() => disclaimer.setOpen(true)} />
+        <ServiceDisclaimerDialog open={disclaimer.open} onOpenChange={disclaimer.setOpen} />
+
+
+
+        {/* Profile completion prompt */}
+        {profile && (() => {
+          const missing: { key: string; label: string }[] = [];
+          if (!profile.date_of_birth) missing.push({ key: "dob", label: "Date of birth" });
+          if (!profile.gender) missing.push({ key: "gender", label: "Gender" });
+          if (userEducations.length === 0) missing.push({ key: "edu", label: "Education" });
+          if (!profile.province) missing.push({ key: "province", label: "Province" });
+          if (!profile.domicile) missing.push({ key: "domicile", label: "Domicile" });
+
+          if (missing.length === 0) return null;
+
+          return (
+            <div className="mb-6 rounded-lg border border-warning/40 bg-warning/10 p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                <div className="h-10 w-10 rounded-lg bg-warning/20 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-warning" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-foreground mb-1">
+                    Complete your profile for better job matches
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    We use these details to check your eligibility for government jobs. Please add:
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {missing.map((m) => (
+                      <Badge key={m.key} variant="outline" className="border-warning/50 text-foreground">
+                        {m.label}
+                      </Badge>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setActiveTab("profile");
+                      setIsEditing(true);
+                      setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
+                    }}
+                    className="gap-2"
+                  >
+                    Complete Profile
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -226,6 +310,9 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Test Prep cross-promotion */}
+        <TestPrepPromo className="mb-6" />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -409,6 +496,16 @@ const Dashboard = () => {
 
           {/* Profile Tab */}
           <TabsContent value="profile">
+            {!profile?.phone && (
+              <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 flex items-start gap-2 text-sm">
+                <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                <p className="text-foreground">
+                  <span className="font-medium">Phone number is required.</span> We use it to
+                  coordinate your application status and contact you about job updates. Please
+                  add it below.
+                </p>
+              </div>
+            )}
             <div className="card-elevated p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold text-foreground">
@@ -450,6 +547,7 @@ const Dashboard = () => {
                         province: profile?.province || "",
                         domicile: profile?.domicile || "",
                         phone: profile?.phone || "",
+                        gmail: (profile as any)?.gmail || "",
                       });
                       setEditEducations(
                         userEducations.map((e) => ({
@@ -501,12 +599,29 @@ const Dashboard = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Phone</Label>
+                      <Label>
+                        Phone <span className="text-destructive">*</span>
+                      </Label>
                       <Input
                         value={editForm.phone}
                         onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                         placeholder="+92 300 1234567"
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Required &mdash; used to contact you about your applications.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Gmail address (optional)</Label>
+                      <Input
+                        type="email"
+                        value={editForm.gmail}
+                        onChange={(e) => setEditForm({ ...editForm, gmail: e.target.value })}
+                        placeholder="yourname@gmail.com"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Optional &mdash; lets us connect your Gmail for job updates.
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-4">
@@ -637,41 +752,7 @@ const Dashboard = () => {
 
           {/* Documents Tab */}
           <TabsContent value="documents">
-            <div className="card-elevated p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-foreground">
-                  My Documents
-                </h2>
-                <Button className="gap-2">
-                  <Upload className="h-4 w-4" />
-                  Upload Document
-                </Button>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                {["CNIC", "Matric Certificate", "Intermediate Certificate", "Domicile"].map(
-                  (doc) => (
-                    <div
-                      key={doc}
-                      className="flex items-center justify-between p-4 rounded-lg border border-dashed border-border"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-muted-foreground">{doc}</span>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        Upload
-                      </Button>
-                    </div>
-                  )
-                )}
-              </div>
-
-              <p className="mt-4 text-sm text-muted-foreground">
-                Documents are optional but help our AI auto-fill your information
-                and speed up the application process.
-              </p>
-            </div>
+            <MyDocuments />
           </TabsContent>
         </Tabs>
       </div>

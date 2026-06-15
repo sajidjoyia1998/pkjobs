@@ -11,12 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import ApplicationDetailsDialog from "@/components/admin/ApplicationDetailsDialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -47,6 +42,10 @@ import { useUpdateWorkRequestStatus } from "@/hooks/useWorkRequests";
 import { openApplicationChat } from "@/components/chat/ChatWidget";
 import { toast } from "sonner";
 import ExpertStatsCards from "@/components/expert/ExpertStatsCards";
+import RefreshButton from "@/components/RefreshButton";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/PullToRefreshIndicator";
 
 const statusLabels: Record<string, string> = {
   pending: "Pending",
@@ -78,8 +77,8 @@ interface UserDocument {
 const useExpertDocuments = (userIds: string[]) => {
   return useQuery({
     queryKey: ["expert-user-documents", userIds],
-    queryFn: async () => {
-      if (!userIds.length) return new Map<string, UserDocument[]>();
+    queryFn: async (): Promise<Record<string, UserDocument[]>> => {
+      if (!userIds.length) return {};
 
       const { data, error } = await supabase
         .from("user_documents")
@@ -89,11 +88,11 @@ const useExpertDocuments = (userIds: string[]) => {
 
       if (error) throw error;
 
-      const docMap = new Map<string, UserDocument[]>();
+      const docMap: Record<string, UserDocument[]> = {};
       for (const doc of data || []) {
-        const existing = docMap.get(doc.user_id) || [];
-        existing.push(doc as UserDocument);
-        docMap.set(doc.user_id, existing);
+        const list = docMap[doc.user_id] || [];
+        list.push(doc as UserDocument);
+        docMap[doc.user_id] = list;
       }
       return docMap;
     },
@@ -107,7 +106,7 @@ const ExpertDashboard = () => {
   const [activeTab, setActiveTab] = useState("assigned");
 
   const userIds = [...new Set(assignments.map((a) => a.user_id))];
-  const { data: documentsMap = new Map() } = useExpertDocuments(userIds);
+  const { data: documentsMap = {} } = useExpertDocuments(userIds);
 
   const activeAssignments = assignments.filter(
     (a) => !["completed", "applied"].includes(a.status)
@@ -124,16 +123,32 @@ const ExpertDashboard = () => {
     );
   }
 
+  const qc = useQueryClient();
+  const ptr = usePullToRefresh({
+    onRefresh: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ["expert-assignments"] }),
+        qc.invalidateQueries({ queryKey: ["expert-user-documents"] }),
+      ]).then(() => undefined),
+  });
+
   return (
     <div className="py-4 sm:py-8">
+      <PullToRefreshIndicator {...ptr} />
       <div className="container px-4 sm:px-6">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
-            Expert Dashboard
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Welcome, {profile?.full_name || "Expert"}. Manage your assigned applications.
-          </p>
+        <div className="mb-6 sm:mb-8 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+              Expert Dashboard
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Welcome, {profile?.full_name || "Expert"}. Manage your assigned applications.
+            </p>
+          </div>
+          <RefreshButton
+            queryKeys={[["expert-assignments"], ["expert-user-documents"]]}
+            label="Refresh"
+          />
         </div>
 
         {/* Stats */}
@@ -162,7 +177,7 @@ const ExpertDashboard = () => {
                   <AssignmentCard
                     key={assignment.id}
                     assignment={assignment}
-                    documents={documentsMap.get(assignment.user_id) || []}
+                    documents={documentsMap[assignment.user_id] || []}
                   />
                 ))}
               </div>
@@ -181,7 +196,7 @@ const ExpertDashboard = () => {
                   <AssignmentCard
                     key={assignment.id}
                     assignment={assignment}
-                    documents={documentsMap.get(assignment.user_id) || []}
+                    documents={documentsMap[assignment.user_id] || []}
                   />
                 ))}
               </div>
@@ -402,79 +417,23 @@ const AssignmentCard = ({
         </div>
       </div>
 
-      {/* Profile Detail Dialog */}
-      <Dialog open={viewingProfile} onOpenChange={setViewingProfile}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Applicant Profile</DialogTitle>
-          </DialogHeader>
-          {assignment.profile && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <User className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Name</p>
-                  <p className="font-medium text-sm">{assignment.profile.full_name}</p>
-                </div>
-              </div>
-              {assignment.profile.phone && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <Phone className="h-4 w-4 text-primary shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Phone</p>
-                    <p className="font-medium text-sm">{assignment.profile.phone}</p>
-                  </div>
-                </div>
-              )}
-              {assignment.profile.province && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <MapPin className="h-4 w-4 text-primary shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Province</p>
-                    <p className="font-medium text-sm">{assignment.profile.province}</p>
-                  </div>
-                </div>
-              )}
-              {assignment.type === "application" && assignment.job && (
-                <div className="border-t border-border pt-3 mt-3">
-                  <h4 className="text-sm font-medium text-foreground mb-2">Job Details</h4>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="text-muted-foreground">Title:</span> {assignment.job.title}</p>
-                    <p><span className="text-muted-foreground">Department:</span> {assignment.job.department}</p>
-                    <p><span className="text-muted-foreground">Last Date:</span> {new Date(assignment.job.last_date).toLocaleDateString()}</p>
-                    <p><span className="text-muted-foreground">Total Fee:</span> Rs. {Number(assignment.job.total_fee).toLocaleString()}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Documents in profile dialog */}
-              {documents.length > 0 && (
-                <div className="border-t border-border pt-3 mt-3">
-                  <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Documents ({documents.length})
-                  </h4>
-                  <div className="space-y-2">
-                    {documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between p-2 rounded bg-muted/50">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {getDocIcon(doc.document_type)}
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium truncate">{doc.file_name}</p>
-                            <p className="text-xs text-muted-foreground capitalize">{doc.document_type.replace(/_/g, " ")}</p>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={() => window.open(doc.file_url, "_blank")}>
-                          <Download className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Full Applicant Details Dialog */}
+      <ApplicationDetailsDialog
+        open={viewingProfile}
+        onOpenChange={setViewingProfile}
+        application={{
+          id: assignment.id,
+          user_id: assignment.user_id,
+          status: assignment.status,
+          payment_amount: assignment.payment_amount,
+          notes: assignment.notes,
+          created_at: assignment.created_at,
+          job: assignment.job,
+          category: assignment.category,
+          custom_description: assignment.custom_description,
+        }}
+        type={assignment.type}
+      />
     </>
   );
 };

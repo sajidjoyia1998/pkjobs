@@ -2,6 +2,7 @@ import { FileText, Image, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { useSignedAttachmentUrl } from '@/hooks/useSignedAttachmentUrl';
 
 interface ChatMessageBubbleProps {
   content: string;
@@ -22,10 +23,11 @@ const ChatMessageBubble = ({
 }: ChatMessageBubbleProps) => {
   const isImage = attachmentType?.startsWith('image/');
   const isPdf = attachmentType === 'application/pdf';
+  const resolvedUrl = useSignedAttachmentUrl(attachmentUrl);
 
   const handleDownload = () => {
-    if (attachmentUrl) {
-      window.open(attachmentUrl, '_blank');
+    if (resolvedUrl) {
+      window.open(resolvedUrl, '_blank');
     }
   };
 
@@ -42,12 +44,16 @@ const ChatMessageBubble = ({
       {attachmentUrl && (
         <div className="mb-2">
           {isImage ? (
-            <a href={attachmentUrl} target="_blank" rel="noopener noreferrer">
-              <img
-                src={attachmentUrl}
-                alt={attachmentName || 'Attachment'}
-                className="max-w-full rounded-md max-h-48 object-cover"
-              />
+            <a href={resolvedUrl ?? undefined} target="_blank" rel="noopener noreferrer">
+              {resolvedUrl ? (
+                <img
+                  src={resolvedUrl}
+                  alt={attachmentName || 'Attachment'}
+                  className="max-w-full rounded-md max-h-48 object-cover"
+                />
+              ) : (
+                <div className="h-32 w-48 rounded-md bg-muted-foreground/10 animate-pulse" />
+              )}
             </a>
           ) : isPdf ? (
             <div 
@@ -71,7 +77,7 @@ const ChatMessageBubble = ({
             </div>
           ) : (
             <a 
-              href={attachmentUrl} 
+              href={resolvedUrl ?? undefined} 
               target="_blank" 
               rel="noopener noreferrer"
               className={cn(

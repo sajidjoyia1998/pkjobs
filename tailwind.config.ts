@@ -100,6 +100,11 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "chat-vibrate": {
+          "0%, 100%": { transform: "translateX(0) rotate(0)" },
+          "10%, 30%, 50%, 70%, 90%": { transform: "translateX(-3px) rotate(-8deg)" },
+          "20%, 40%, 60%, 80%": { transform: "translateX(3px) rotate(8deg)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -107,6 +112,7 @@ export default {
         "fade-in": "fade-in 0.5s ease-out forwards",
         "slide-up": "slide-up 0.6s ease-out forwards",
         "scale-in": "scale-in 0.4s ease-out forwards",
+        "chat-vibrate": "chat-vibrate 0.5s ease-in-out 2",
       },
       boxShadow: {
         'primary': '0 4px 14px 0 hsl(153 60% 28% / 0.25)',
